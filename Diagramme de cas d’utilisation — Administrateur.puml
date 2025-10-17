@@ -1,0 +1,28 @@
+@startuml CasUtilisation_Administrateur
+
+title Cas d’Utilisation - Acteur : Administrateur
+left to right direction
+
+actor Administrateur
+
+rectangle "Système de Gestion du Transport Urbain" {
+
+  package "Administration du Système" {
+    usecase "Gérer les utilisateurs" as UC19
+    usecase "Gérer les trajets et routes" as UC20
+    usecase "Gérer les horaires" as UC21
+    usecase "Gérer les bus" as UC22
+    usecase "Gérer les tarifs" as UC23
+    usecase "Consulter les statistiques" as UC24
+  }
+}
+
+'=== Relations Administrateur ===
+Administrateur --> UC19
+Administrateur --> UC20
+Administrateur --> UC21
+Administrateur --> UC22
+Administrateur --> UC23
+Administrateur --> UC24
+
+@enduml

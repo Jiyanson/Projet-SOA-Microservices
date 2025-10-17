@@ -1,0 +1,108 @@
+@startuml
+title Diagramme de Classes Global - Système de Gestion de Transport Urbain
+
+'=== Enumerations ===
+enum UserRole {
+  PASSENGER
+  DRIVER
+  ADMIN
+}
+
+enum TicketStatus {
+  VALID
+  USED
+  EXPIRED
+  CANCELLED
+}
+
+enum SubscriptionType {
+  MONTHLY
+  ANNUAL
+}
+
+'=== Core Domain Classes ===
+class User {
+  - id: Long
+  - firstName: String
+  - lastName: String
+  - email: String
+  - passwordHash: String
+  - role: UserRole
+  - isActive: Boolean
+  + login(email: String, password: String): Boolean
+  + logout(): void
+  + updateProfile(): void
+}
+
+class Passenger {
+  - loyaltyPoints: Integer
+  + addPoints(points: Integer): void
+}
+
+class Driver {
+  - licenseNumber: String
+  - hireDate: LocalDate
+  + startShift(): void
+  + endShift(): void
+}
+
+class Bus {
+  - id: Long
+  - registrationNumber: String
+  - capacity: Integer
+  - currentLocation: String
+  + updateLocation(location: String): void
+}
+
+class Route {
+  - id: Long
+  - origin: String
+  - destination: String
+  - distance: Double
+}
+
+class Schedule {
+  - id: Long
+  - departureTime: LocalDateTime
+  - arrivalTime: LocalDateTime
+  + calculateDuration(): Duration
+}
+
+class Ticket {
+  - id: Long
+  - issueDate: LocalDateTime
+  - price: Double
+  - status: TicketStatus
+  + validate(): Boolean
+  + cancel(): void
+}
+
+class Subscription {
+  - id: Long
+  - startDate: LocalDate
+  - endDate: LocalDate
+  - type: SubscriptionType
+  - price: Double
+  + renew(): void
+  + cancel(): void
+}
+
+class Notification {
+  - id: Long
+  - message: String
+  - sentAt: LocalDateTime
+  + sendToUser(user: User): void
+}
+
+'=== Relationships with multiplicity ===
+User <|-- Passenger
+User <|-- Driver
+Driver "1" --> "0..*" Bus : conduit
+Bus "1" --> "1" Route : suit
+Route "1" --> "0..*" Schedule : a
+Passenger "1" --> "0..*" Ticket : achète
+Passenger "1" --> "0..*" Subscription : souscrit
+Ticket "1" --> "1" Schedule : correspond à
+Subscription "1" --> "1" Passenger : appartient à
+Notification "1" --> "0..*" User : envoyée à
+@enduml

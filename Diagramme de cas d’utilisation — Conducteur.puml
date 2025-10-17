@@ -1,0 +1,49 @@
+@startuml CasUtilisation_Conducteur
+
+title Cas d’Utilisation - Acteur : Conducteur
+left to right direction
+
+actor Conducteur
+actor "API de Géolocalisation" as GeoAPI
+actor "Service Email" as EmailService
+actor "Service SMS" as SMSService
+
+rectangle "Système de Gestion du Transport Urbain" {
+
+  package "Authentification" {
+    usecase "Se connecter" as UC2
+  }
+
+  package "Gestion des Trajets" {
+    usecase "Démarrer un trajet" as UC15
+    usecase "Terminer un trajet" as UC16
+    usecase "Mettre à jour sa position" as UC14
+  }
+
+  package "Suivi et Incidents" {
+    usecase "Signaler un incident" as UC17
+    usecase "Valider les tickets" as UC18
+  }
+
+  package "Notifications" {
+    usecase "Envoyer des alertes" as UC26
+  }
+}
+
+'=== Relations Conducteur ===
+Conducteur --> UC2
+Conducteur --> UC14
+Conducteur --> UC15
+Conducteur --> UC16
+Conducteur --> UC17
+Conducteur --> UC18
+
+'=== Include ===
+UC17 ..> UC26 : <<include>>
+
+'=== Externes ===
+UC14 --> GeoAPI
+UC26 --> EmailService
+UC26 --> SMSService
+
+@enduml

@@ -1,0 +1,71 @@
+@startuml CasUtilisation_Passager
+
+title Cas d’Utilisation - Acteur : Passager
+left to right direction
+
+actor Passager
+actor "Système de Paiement" as PaymentSystem
+actor "API de Géolocalisation" as GeoAPI
+actor "Service Email" as EmailService
+actor "Service SMS" as SMSService
+
+rectangle "Système de Gestion du Transport Urbain" {
+
+  package "Gestion des Utilisateurs" {
+    usecase "S'inscrire" as UC1
+    usecase "Se connecter" as UC2
+    usecase "Gérer son profil" as UC3
+  }
+
+  package "Gestion des Tickets" {
+    usecase "Acheter un ticket" as UC4
+    usecase "Consulter l’historique des tickets" as UC5
+    usecase "Annuler un ticket" as UC6
+    usecase "Effectuer un paiement" as UC7
+  }
+
+  package "Gestion des Abonnements" {
+    usecase "Souscrire un abonnement" as UC8
+    usecase "Renouveler un abonnement" as UC9
+    usecase "Annuler un abonnement" as UC10
+  }
+
+  package "Consultation et Suivi" {
+    usecase "Consulter les horaires" as UC11
+    usecase "Consulter les trajets disponibles" as UC12
+    usecase "Suivre un bus en temps réel" as UC13
+  }
+
+  package "Notifications" {
+    usecase "Recevoir des notifications" as UC25
+  }
+}
+
+'=== Relations Passager ===
+Passager --> UC1
+Passager --> UC2
+Passager --> UC3
+Passager --> UC4
+Passager --> UC5
+Passager --> UC6
+Passager --> UC8
+Passager --> UC9
+Passager --> UC10
+Passager --> UC11
+Passager --> UC12
+Passager --> UC13
+Passager --> UC25
+
+'=== Include ===
+UC4 ..> UC7 : <<include>>
+UC8 ..> UC7 : <<include>>
+UC4 ..> UC25 : <<include>>
+UC8 ..> UC25 : <<include>>
+
+'=== Systèmes externes ===
+UC7 --> PaymentSystem
+UC13 --> GeoAPI
+UC25 --> EmailService
+UC25 --> SMSService
+
+@enduml
