@@ -1,0 +1,65 @@
+# Urban Transport System - Microservices Architecture
+
+## Clients
+- Web App
+- Mobile App
+- Driver App
+
+## API Gateway
+- Load Balancer
+- Authentication
+- Rate Limiting
+- Routing
+
+## Microservices
+- User Service
+- Ticket Service
+- Route Service
+- Geolocation Service
+- Subscription Service
+- Notification Service
+- Payment Service
+
+## Databases
+- User DB
+- Ticket DB
+- Route DB
+- Location DB
+- Subscription DB
+
+## Message Broker
+- RabbitMQ or Kafka
+
+## External Services
+- Google Maps API
+- Payment Gateway
+- Email Service
+- SMS Service
+
+## Cloud Infrastructure
+- Docker (Containerization)
+- Kubernetes (Orchestration, Auto-Scaling, Service Discovery)
+
+---
+
+### Connections
+- Web App → API Gateway
+- Mobile App → API Gateway
+- Driver App → API Gateway
+
+- API Gateway → All Microservices
+
+- Each Microservice → its own Database
+
+- All Microservices → Message Broker → Notification Service
+
+- Ticket Service → Payment Service → Payment Gateway
+- Subscription Service → Payment Service → Payment Gateway
+
+- Geolocation Service → Google Maps API
+
+- Notification Service → Email Service
+- Notification Service → SMS Service
+
+- Kubernetes → Deploys all Microservices
+- Docker → Containers for each Microservice

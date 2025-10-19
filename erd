@@ -1,0 +1,727 @@
+// ============================================================
+// SYSTÈME DE TRANSPORT URBAIN - ARCHITECTURE MICROSERVICES
+// Base de données décentralisée (Database per Service)
+// ============================================================
+
+// ==================== USER SERVICE DATABASE ====================
+Project user_service_db {
+  database_type: 'PostgreSQL'
+  Note: 'Service de gestion des utilisateurs et authentification'
+}
+
+Table users {
+  id bigint [primary key, increment]
+  email varchar(255) [unique, not null]
+  password_hash varchar(255) [not null]
+  first_name varchar(100) [not null]
+  last_name varchar(100) [not null]
+  phone_number varchar(20)
+  role user_role [not null, note: 'PASSENGER, DRIVER, ADMIN']
+  is_active boolean [default: true]
+  last_login_at timestamp
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  
+  indexes {
+    email [unique]
+    role
+    (is_active, role)
+  }
+  
+  Note: 'Table principale des utilisateurs avec authentification'
+}
+
+Table passengers {
+  id bigint [primary key, increment]
+  user_id bigint [not null, unique]
+  loyalty_points integer [default: 0]
+  preferred_language varchar(10) [default: 'fr']
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  
+  indexes {
+    user_id [unique]
+    loyalty_points
+  }
+  
+  Note: 'Informations spécifiques aux passagers'
+}
+
+Table drivers {
+  id bigint [primary key, increment]
+  user_id bigint [not null, unique]
+  license_number varchar(50) [unique, not null]
+  bus_id bigint
+  hire_date date [not null]
+  status driver_status [default: 'AVAILABLE', note: 'AVAILABLE, ON_DUTY, OFF_DUTY']
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  
+  indexes {
+    user_id [unique]
+    license_number [unique]
+    status
+  }
+  
+  Note: 'Informations spécifiques aux conducteurs'
+}
+
+Table admins {
+  id bigint [primary key, increment]
+  user_id bigint [not null, unique]
+  permissions text[] [note: 'Array of permission strings']
+  department varchar(100)
+  created_at timestamp [default: `now()`]
+  
+  indexes {
+    user_id [unique]
+  }
+  
+  Note: 'Informations spécifiques aux administrateurs'
+}
+
+Enum user_role {
+  PASSENGER
+  DRIVER
+  ADMIN
+  SUPER_ADMIN
+}
+
+Enum driver_status {
+  AVAILABLE
+  ON_DUTY
+  OFF_DUTY
+  ON_LEAVE
+}
+
+Ref: passengers.user_id - users.id [delete: cascade]
+Ref: drivers.user_id - users.id [delete: cascade]
+Ref: admins.user_id - users.id [delete: cascade]
+
+
+// ==================== TICKET SERVICE DATABASE ====================
+Project ticket_service_db {
+  database_type: 'PostgreSQL'
+  Note: 'Service de gestion des tickets et paiements'
+}
+
+Table orders {
+  id bigint [primary key, increment]
+  user_id bigint [not null, note: 'Reference to user who made the order']
+  order_number varchar(50) [unique, not null]
+  total_amount decimal(10,2) [not null]
+  status order_status [default: 'PENDING']
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  
+  indexes {
+    user_id
+    order_number [unique]
+    status
+    created_at
+  }
+  
+  Note: 'Commande regroupant plusieurs tickets (panier d achat)'
+}
+
+Table tickets {
+  id bigint [primary key, increment]
+  order_id bigint [not null, note: 'Belongs to an order']
+  user_id bigint [not null, note: 'Reference to user in User Service']
+  ticket_type ticket_type [not null]
+  price decimal(10,2) [not null]
+  purchase_date timestamp [default: `now()`]
+  valid_from timestamp [not null]
+  valid_until timestamp [not null]
+  status ticket_status [default: 'ACTIVE']
+  qr_code varchar(255) [unique, not null]
+  usage_count integer [default: 0]
+  max_usage integer [not null]
+  route_id bigint [note: 'Optional: specific route ticket']
+  passenger_name varchar(255) [note: 'Optional: for tickets bought for others']
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  
+  indexes {
+    order_id
+    user_id
+    qr_code [unique]
+    status
+    (valid_from, valid_until)
+    purchase_date
+  }
+  
+  Note: 'Tickets de transport avec QR code'
+}
+
+Table payments {
+  id bigint [primary key, increment]
+  order_id bigint [unique, note: 'One payment per order']
+  subscription_id bigint [unique, note: 'OR one payment per subscription']
+  user_id bigint [not null]
+  amount decimal(10,2) [not null]
+  payment_method payment_method [not null]
+  transaction_id varchar(255) [unique]
+  status payment_status [default: 'PENDING']
+  payment_date timestamp [default: `now()`]
+  currency varchar(3) [default: 'MAD']
+  provider_response text
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  
+  indexes {
+    user_id
+    order_id [unique]
+    subscription_id [unique]
+    transaction_id [unique]
+    status
+    payment_date
+  }
+  
+  Note: 'Un paiement pour une commande complète (plusieurs tickets) OU un abonnement'
+}
+
+Table refunds {
+  id bigint [primary key, increment]
+  payment_id bigint [not null]
+  refund_amount decimal(10,2) [not null]
+  refund_reason text
+  refund_status refund_status [default: 'PENDING']
+  refund_date timestamp [default: `now()`]
+  processed_by bigint [note: 'Admin user ID']
+  transaction_id varchar(255) [unique]
+  is_partial boolean [default: false, note: 'Partial refund for specific tickets']
+  created_at timestamp [default: `now()`]
+  
+  indexes {
+    payment_id
+    refund_status
+    refund_date
+  }
+  
+  Note: 'Remboursements complets ou partiels'
+}
+
+Enum ticket_type {
+  SINGLE_JOURNEY
+  DAY_PASS
+  MULTI_TRIP_5
+  MULTI_TRIP_10
+  WEEKEND_PASS
+}
+
+Enum ticket_status {
+  ACTIVE
+  USED
+  PARTIALLY_USED
+  EXPIRED
+  CANCELLED
+  REFUNDED
+}
+
+Enum order_status {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
+
+Enum payment_method {
+  CREDIT_CARD
+  DEBIT_CARD
+  PAYPAL
+  MOBILE_MONEY
+  CASH
+}
+
+Enum payment_status {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+  CANCELLED
+}
+
+Enum refund_status {
+  PENDING
+  APPROVED
+  REJECTED
+  COMPLETED
+  FAILED
+}
+
+Ref: tickets.order_id > orders.id [delete: cascade]
+Ref: payments.order_id - orders.id [delete: set null]
+Ref: refunds.payment_id > payments.id [delete: cascade]
+
+
+// ==================== ROUTE SERVICE DATABASE ====================
+Project route_service_db {
+  database_type: 'PostgreSQL'
+  Note: 'Service de gestion des routes, trajets et horaires'
+}
+
+Table routes {
+  id bigint [primary key, increment]
+  route_number varchar(20) [unique, not null]
+  route_name varchar(255) [not null]
+  origin varchar(255) [not null]
+  destination varchar(255) [not null]
+  distance double [not null, note: 'Distance in kilometers']
+  estimated_duration integer [not null, note: 'Duration in minutes']
+  is_active boolean [default: true]
+  operating_hours varchar(50) [note: 'e.g., 06:00-23:00']
+  frequency integer [note: 'Frequency in minutes']
+  description text
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  
+  indexes {
+    route_number [unique]
+    is_active
+    (origin, destination)
+  }
+  
+  Note: 'Routes principales du réseau de transport'
+}
+
+Table stops {
+  id bigint [primary key, increment]
+  route_id bigint [not null]
+  stop_name varchar(255) [not null]
+  latitude double [not null]
+  longitude double [not null]
+  order_index integer [not null]
+  estimated_arrival_time integer [note: 'Offset in minutes from departure']
+  address varchar(500)
+  has_accessibility boolean [default: false]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  
+  indexes {
+    route_id
+    (route_id, order_index) [unique]
+    (latitude, longitude)
+  }
+  
+  Note: 'Arrêts de bus sur chaque route'
+}
+
+Table schedules {
+  id bigint [primary key, increment]
+  route_id bigint [not null]
+  bus_id bigint [not null, note: 'Reference to bus']
+  driver_id bigint [not null, note: 'Reference to driver']
+  departure_time timestamp [not null]
+  arrival_time timestamp [not null]
+  day_of_week schedule_day [not null]
+  status schedule_status [default: 'SCHEDULED']
+  available_seats integer
+  delay_minutes integer [default: 0]
+  cancellation_reason text
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  
+  indexes {
+    route_id
+    bus_id
+    driver_id
+    status
+    (route_id, departure_time)
+    day_of_week
+  }
+  
+  Note: 'Horaires planifiés pour chaque trajet'
+}
+
+Enum schedule_status {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  DELAYED
+}
+
+Enum schedule_day {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+Ref: stops.route_id > routes.id [delete: cascade]
+
+
+// ==================== GEOLOCATION SERVICE DATABASE ====================
+Project geolocation_service_db {
+  database_type: 'PostgreSQL'
+  Note: 'Service de géolocalisation en temps réel des bus'
+}
+
+Table buses {
+  id bigint [primary key, increment]
+  bus_number varchar(20) [unique, not null]
+  license_plate varchar(20) [unique, not null]
+  capacity integer [not null]
+  type bus_type [not null]
+  status bus_status [default: 'AVAILABLE']
+  manufacturer varchar(100)
+  year_of_manufacture integer
+  last_maintenance_date date
+  has_wifi boolean [default: false]
+  has_ac boolean [default: false]
+  has_accessibility boolean [default: false]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  
+  indexes {
+    bus_number [unique]
+    license_plate [unique]
+    status
+    type
+  }
+  
+  Note: 'Flotte de bus'
+}
+
+Table bus_locations {
+  id bigint [primary key, increment]
+  bus_id bigint [not null]
+  latitude double [not null]
+  longitude double [not null]
+  speed double [note: 'Speed in km/h']
+  heading double [note: 'Direction in degrees (0-360)']
+  accuracy double [note: 'GPS accuracy in meters']
+  altitude double
+  timestamp timestamp [default: `now()`]
+  route_id bigint [note: 'Current route']
+  next_stop_id bigint [note: 'Next stop on route']
+  
+  indexes {
+    bus_id
+    (bus_id, timestamp) [unique]
+    timestamp
+    route_id
+  }
+  
+  Note: 'Positions GPS des bus en temps réel'
+}
+
+Table bus_maintenance_logs {
+  id bigint [primary key, increment]
+  bus_id bigint [not null]
+  maintenance_type varchar(100) [not null]
+  description text
+  maintenance_date date [not null]
+  cost decimal(10,2)
+  next_maintenance_date date
+  performed_by varchar(255)
+  created_at timestamp [default: `now()`]
+  
+  indexes {
+    bus_id
+    maintenance_date
+  }
+  
+  Note: 'Historique de maintenance des bus'
+}
+
+Enum bus_type {
+  STANDARD
+  ARTICULATED
+  DOUBLE_DECKER
+  MINIBUS
+  ELECTRIC
+}
+
+Enum bus_status {
+  AVAILABLE
+  IN_SERVICE
+  OUT_OF_SERVICE
+  MAINTENANCE
+  BREAKDOWN
+}
+
+Ref: bus_locations.bus_id > buses.id [delete: cascade]
+Ref: bus_maintenance_logs.bus_id > buses.id [delete: cascade]
+
+
+// ==================== SUBSCRIPTION SERVICE DATABASE ====================
+Project subscription_service_db {
+  database_type: 'PostgreSQL'
+  Note: 'Service de gestion des abonnements'
+}
+
+Table subscriptions {
+  id bigint [primary key, increment]
+  user_id bigint [not null, note: 'Reference to user']
+  subscription_type subscription_type [not null]
+  price decimal(10,2) [not null]
+  start_date timestamp [not null]
+  end_date timestamp [not null]
+  status subscription_status [default: 'ACTIVE']
+  auto_renewal boolean [default: false]
+  payment_id bigint [note: 'Reference to payment']
+  cancelled_at timestamp
+  cancellation_reason text
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  
+  indexes {
+    user_id
+    status
+    (start_date, end_date)
+    subscription_type
+  }
+  
+  Note: 'Abonnements mensuels et annuels'
+}
+
+Table subscription_usage {
+  id bigint [primary key, increment]
+  subscription_id bigint [not null]
+  usage_date timestamp [default: `now()`]
+  route_id bigint
+  bus_id bigint
+  
+  indexes {
+    subscription_id
+    usage_date
+  }
+  
+  Note: 'Historique d\'utilisation des abonnements'
+}
+
+Enum subscription_type {
+  MONTHLY
+  QUARTERLY
+  SEMI_ANNUAL
+  ANNUAL
+  STUDENT_MONTHLY
+  SENIOR_MONTHLY
+}
+
+Enum subscription_status {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+  SUSPENDED
+  PENDING
+}
+
+Ref: subscription_usage.subscription_id > subscriptions.id [delete: cascade]
+
+
+// ==================== NOTIFICATION SERVICE DATABASE ====================
+Project notification_service_db {
+  database_type: 'MongoDB'
+  Note: 'Service de notifications par email et SMS'
+}
+
+Table notifications {
+  id bigint [primary key, increment]
+  user_id bigint [not null]
+  notification_type notification_type [not null]
+  channel notification_channel [not null]
+  subject varchar(255)
+  message text [not null]
+  status notification_status [default: 'PENDING']
+  sent_at timestamp
+  read_at timestamp
+  metadata jsonb [note: 'Additional data as JSON']
+  retry_count integer [default: 0]
+  error_message text
+  created_at timestamp [default: `now()`]
+  
+  indexes {
+    user_id
+    status
+    notification_type
+    created_at
+    sent_at
+  }
+  
+  Note: 'Notifications envoyées aux utilisateurs'
+}
+
+Table notification_preferences {
+  id bigint [primary key, increment]
+  user_id bigint [not null, unique]
+  email_enabled boolean [default: true]
+  sms_enabled boolean [default: false]
+  push_enabled boolean [default: true]
+  delay_alerts boolean [default: true]
+  cancellation_alerts boolean [default: true]
+  subscription_reminders boolean [default: true]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()`]
+  
+  indexes {
+    user_id [unique]
+  }
+  
+  Note: 'Préférences de notification par utilisateur'
+}
+
+Enum notification_type {
+  TICKET_PURCHASE
+  SUBSCRIPTION_CREATED
+  SUBSCRIPTION_EXPIRING
+  SCHEDULE_DELAY
+  SCHEDULE_CANCELLATION
+  PAYMENT_SUCCESS
+  PAYMENT_FAILED
+  GENERAL_ALERT
+}
+
+Enum notification_channel {
+  EMAIL
+  SMS
+  PUSH
+  IN_APP
+}
+
+Enum notification_status {
+  PENDING
+  SENT
+  DELIVERED
+  FAILED
+  READ
+}
+
+
+// ==================== EVENT STORE (for Event Sourcing) ====================
+Project event_store_db {
+  database_type: 'PostgreSQL'
+  Note: 'Event Store pour Event Sourcing et audit'
+}
+
+Table domain_events {
+  id bigint [primary key, increment]
+  aggregate_id bigint [not null]
+  aggregate_type varchar(100) [not null, note: 'Ticket, Subscription, Schedule, etc.']
+  event_type varchar(100) [not null]
+  event_data jsonb [not null]
+  user_id bigint
+  timestamp timestamp [default: `now()`]
+  version integer [not null]
+  
+  indexes {
+    aggregate_id
+    aggregate_type
+    event_type
+    timestamp
+    (aggregate_id, version) [unique]
+  }
+  
+  Note: 'Historique de tous les événements du système'
+}
+
+
+// ==================== ANALYTICS DATABASE ====================
+Project analytics_db {
+  database_type: 'PostgreSQL'
+  Note: 'Base de données pour analyses et statistiques'
+}
+
+Table trip_analytics {
+  id bigint [primary key, increment]
+  route_id bigint [not null]
+  bus_id bigint [not null]
+  trip_date date [not null]
+  total_passengers integer [default: 0]
+  total_revenue decimal(10,2) [default: 0]
+  average_delay_minutes integer
+  on_time_performance decimal(5,2)
+  created_at timestamp [default: `now()`]
+  
+  indexes {
+    route_id
+    trip_date
+    (route_id, trip_date)
+  }
+  
+  Note: 'Statistiques par trajet'
+}
+
+Table user_activity_logs {
+  id bigint [primary key, increment]
+  user_id bigint [not null]
+  action varchar(100) [not null]
+  resource_type varchar(50)
+  resource_id bigint
+  ip_address varchar(45)
+  user_agent text
+  timestamp timestamp [default: `now()`]
+  
+  indexes {
+    user_id
+    action
+    timestamp
+  }
+  
+  Note: 'Logs d\'activité utilisateur pour audit'
+}
+
+
+// ==================== NOTES IMPORTANTES ====================
+
+Note: '''
+# ARCHITECTURE MICROSERVICES - DATABASE PER SERVICE
+
+Chaque microservice possède sa propre base de données indépendante:
+
+1. **user_service_db** - Authentification et gestion utilisateurs
+2. **ticket_service_db** - Achat et validation de tickets
+3. **route_service_db** - Routes, arrêts, horaires
+4. **geolocation_service_db** - Localisation temps réel des bus
+5. **subscription_service_db** - Abonnements mensuels/annuels
+6. **notification_service_db** - Envoi de notifications
+7. **event_store_db** - Event Sourcing et audit
+8. **analytics_db** - Analyses et rapports
+
+## COMMUNICATION INTER-SERVICES:
+- Les services communiquent via API REST ou gRPC
+- Les références entre services utilisent uniquement les IDs
+- Message Broker (RabbitMQ/Kafka) pour événements asynchrones
+- API Gateway pour routage centralisé
+
+## POINTS D'AMÉLIORATION PAR RAPPORT AU SCHÉMA INITIAL:
+
+### ✅ Améliorations apportées:
+1. **Séparation par microservice** - Bases de données dédiées
+2. **Enums ajoutés** - Pour types, statuts, rôles
+3. **Index optimisés** - Pour performances des requêtes
+4. **Timestamps** - created_at, updated_at partout
+5. **Types de données** - bigint pour IDs, decimal pour prix
+6. **Contraintes** - unique, not null, default values
+7. **Tables manquantes ajoutées**:
+   - admins
+   - bus_maintenance_logs
+   - subscription_usage
+   - notification_preferences
+   - domain_events (Event Sourcing)
+   - trip_analytics
+   - user_activity_logs
+
+8. **Champs améliorés**:
+   - QR codes pour tickets
+   - Geolocation précise (latitude, longitude, speed, heading)
+   - Métadonnées JSON pour flexibilité
+   - Raisons d'annulation
+   - Préférences de notification
+
+9. **Relations cross-service** - Gérées via IDs uniquement
+10. **Audit trail** - Logs et événements
+
+## TECHNOLOGIES RECOMMANDÉES:
+- PostgreSQL: Pour la plupart des services (transactionnel)
+- MongoDB: Pour notifications (flexibilité documents)
+- Redis: Pour cache et sessions
+- Elasticsearch: Pour recherche full-text (optionnel)
+'''
